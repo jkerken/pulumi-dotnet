@@ -843,4 +843,36 @@ public class PropertyValueTests
         var stringValueOutput = await nestedValueOutput.Value.StringOutput.DataTask;
         Assert.Equal("hello", stringValueOutput.Value);
     }
+
+    public class TagsType : ResourceArgs
+    {
+        [Input("tags", required: false)] private InputMap<string>? _tags;
+
+        public InputMap<string> Tags
+        {
+            get => _tags ??= [];
+            set => _tags = value;
+        }
+    }
+
+    [Fact]
+    public async Task DeserializingUnknownOutputInputMapWorks()
+    {
+        var serializer = CreateSerializer();
+
+        var resource = new DependencyResource("urn:pulumi::stack::proj::type::name");
+        var unknownWithDeps = OutputUtilities.WithDependency(OutputUtilities.CreateUnknown(""), resource);
+        var serialized = await serializer.Serialize(unknownWithDeps);
+
+        var value = Object(Pair("tags", Object(Pair("staticString", new PropertyValue("string")),
+            Pair("staticString2", serialized))));
+
+        var result = await serializer.Deserialize<TagsType>(value);
+
+        Assert.Equal(result.Tags, new InputMap<string>
+        {
+            { "staticString", "string" },
+            { "staticString2", OutputUtilities.CreateUnknown("") }
+        });
+    }
 }
